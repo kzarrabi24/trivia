@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../lib/supabase';
 import { ensureUser } from '../../lib/auth';
@@ -21,6 +21,26 @@ function slugify(v:string){return v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'
 export default function Host(){
  const router=useRouter(); const [name,setName]=useState('Friday Night Trivia'); const [cats,setCats]=useState<Cat[]>(starter); const [saving,setSaving]=useState(false); const [error,setError]=useState('');
  const clueCount=useMemo(()=>cats.reduce((n,c)=>n+c.clues.filter(q=>q.prompt.trim()&&q.answer.trim()).length,0),[cats]);
+
+ useEffect(()=>{ void loadQuestionSetFromUrl(); },[]);
+
+ async function loadQuestionSetFromUrl(){
+  const setId=new URLSearchParams(window.location.search).get('set');
+  if(!setId) return;
+  const {data:set,error:setErr}=await supabase.from('question_sets').select('title').eq('id',setId).single();
+  if(setErr||!set){setError(setErr?.message||'Question set not found.');return;}
+  const {data:rows,error:qErr}=await supabase.from('question_set_questions')
+    .select('category_name,category_order,prompt,answer,value,question_order')
+    .eq('set_id',setId).order('category_order').order('question_order');
+  if(qErr){setError(qErr.message);return;}
+  const grouped=new Map<number,Cat>();
+  (rows||[]).forEach((row:any)=>{
+    if(!grouped.has(row.category_order)) grouped.set(row.category_order,{name:row.category_name,clues:[]});
+    grouped.get(row.category_order)!.clues.push({prompt:row.prompt,answer:row.answer,value:row.value});
+  });
+  const loaded=Array.from(grouped.entries()).sort((a,b)=>a[0]-b[0]).map(([,cat])=>cat);
+  if(loaded.length){setCats(loaded);setName(set.title);}
+ }
  const updateCat=(i:number,patch:Partial<Cat>)=>setCats(cats.map((c,x)=>x===i?{...c,...patch}:c));
  const updateClue=(ci:number,qi:number,key:'prompt'|'answer',value:string)=>setCats(cats.map((c,x)=>x!==ci?c:{...c,clues:c.clues.map((q,y)=>y===qi?{...q,[key]:value}:q)}));
  async function createGame(){
