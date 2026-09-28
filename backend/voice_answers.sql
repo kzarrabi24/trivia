@@ -17,3 +17,11 @@ alter table public.game_players
 --
 -- Audio is never inserted into a BuzzBoard table or Storage bucket.
 -- Correctness is determined server-side from the submitted transcript.
+
+
+-- Voice-answer matching is accent-insensitive and intentionally lenient:
+-- - Unicode accents/diacritics are normalized (e.g. Dončić -> Doncic)
+-- - For multi-word answers, a meaningful last name alone is accepted
+-- - Small speech-to-text misspellings of the last name are accepted
+-- - Whole-answer trigram similarity is used as a final fallback
+-- - Guardrails reject close-but-different names such as Brian vs Bryant
