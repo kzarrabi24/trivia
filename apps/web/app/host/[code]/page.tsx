@@ -24,7 +24,7 @@ export default function HostRoom(){
    .on('postgres_changes',{event:'*',schema:'public',table:'games',filter:'id=eq.'+g.id},async payload=>{const ng=payload.new as Game;setGame(ng);if(ng.active_question_id)await refreshResponses(g.id,ng.active_question_id);else setResponses([])})
    .on('postgres_changes',{event:'*',schema:'public',table:'game_questions',filter:'game_id=eq.'+g.id},()=>refreshQuestions(g.id))
    .on('postgres_changes',{event:'INSERT',schema:'public',table:'buzz_winners',filter:'game_id=eq.'+g.id},payload=>setWinner(payload.new as BuzzWinner))
-   .on('postgres_changes',{event:'INSERT',schema:'public',table:'question_responses',filter:'game_id=eq.'+g.id},()=>{if(game?.active_question_id)refreshResponses(g.id,game.active_question_id)})
+   .on('postgres_changes',{event:'INSERT',schema:'public',table:'question_responses',filter:'game_id=eq.'+g.id},payload=>refreshResponses(g.id,(payload.new as any).question_id))
    .subscribe();
  }catch(e:any){setError(e?.message||'Could not load room')}})();return()=>{mounted=false;if(channel)supabase.removeChannel(channel)}},[code]);
 
