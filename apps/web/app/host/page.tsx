@@ -19,7 +19,7 @@ function roomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.
 function slugify(v:string){return v.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')+'-'+Math.random().toString(36).slice(2,7)}
 
 export default function Host(){
- const router=useRouter(); const [name,setName]=useState('Friday Night Trivia'); const [cats,setCats]=useState<Cat[]>(starter); const [saving,setSaving]=useState(false); const [error,setError]=useState('');
+ const router=useRouter(); const [name,setName]=useState('Friday Night Trivia'); const [cats,setCats]=useState<Cat[]>(starter); const [sourceSetId,setSourceSetId]=useState<string|null>(null); const [saving,setSaving]=useState(false); const [error,setError]=useState('');
  const clueCount=useMemo(()=>cats.reduce((n,c)=>n+c.clues.filter(q=>q.prompt.trim()&&q.answer.trim()).length,0),[cats]);
 
  useEffect(()=>{ void loadQuestionSetFromUrl(); },[]);
@@ -27,7 +27,7 @@ export default function Host(){
  async function loadQuestionSetFromUrl(){
   const setId=new URLSearchParams(window.location.search).get('set');
   if(!setId) return;
-  const {data:set,error:setErr}=await supabase.from('question_sets').select('title').eq('id',setId).single();
+  const {data:set,error:setErr}=await supabase.from('question_sets').select('id,title,source_set_id').eq('id',setId).single();
   if(setErr||!set){setError(setErr?.message||'Question set not found.');return;}
   const {data:rows,error:qErr}=await supabase.from('question_set_questions')
     .select('category_name,category_order,prompt,answer,value,question_order')
@@ -39,7 +39,7 @@ export default function Host(){
     grouped.get(row.category_order)!.clues.push({prompt:row.prompt,answer:row.answer,value:row.value});
   });
   const loaded=Array.from(grouped.entries()).sort((a,b)=>a[0]-b[0]).map(([,cat])=>cat);
-  if(loaded.length){setCats(loaded);setName(set.title);}
+  if(loaded.length){setCats(loaded);setName(set.title);setSourceSetId(set.source_set_id||set.id);}
  }
  const updateCat=(i:number,patch:Partial<Cat>)=>setCats(cats.map((c,x)=>x===i?{...c,...patch}:c));
  const updateClue=(ci:number,qi:number,key:'prompt'|'answer',value:string)=>setCats(cats.map((c,x)=>x!==ci?c:{...c,clues:c.clues.map((q,y)=>y===qi?{...q,[key]:value}:q)}));
@@ -47,7 +47,7 @@ export default function Host(){
   setError(''); setSaving(true);
   try{
    const user=await ensureUser(); const code=roomCode();
-   const {data:game,error:gErr}=await supabase.from('games').insert({host_id:user.id,name:name.trim()||'Trivia Night',code,status:'lobby'}).select().single();
+   const {data:game,error:gErr}=await supabase.from('games').insert({host_id:user.id,name:name.trim()||'Trivia Night',code,status:'lobby',source_question_set_id:sourceSetId}).select().single();
    if(gErr||!game) throw gErr||new Error('Could not create game');
    for(let ci=0;ci<cats.length;ci++){
     const cat=cats[ci]; if(!cat.name.trim()) continue;
