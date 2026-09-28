@@ -31,11 +31,19 @@ export default function Host(){
    if(gErr||!game) throw gErr||new Error('Could not create game');
    for(let ci=0;ci<cats.length;ci++){
     const cat=cats[ci]; if(!cat.name.trim()) continue;
-    const {data:catalogCat}=await supabase.from('categories').insert({name:cat.name.trim(),slug:slugify(cat.name),created_by:user.id}).select().single();
+    const {data:catalogCat,error:catErr}=await supabase.from('categories').insert({name:cat.name.trim(),slug:slugify(cat.name),created_by:user.id}).select().single();
+    if(catErr) throw catErr;
     const {data:gameCat,error:gcErr}=await supabase.from('game_categories').insert({game_id:game.id,category_id:catalogCat?.id??null,name:cat.name.trim(),sort_order:ci}).select().single();
     if(gcErr||!gameCat) throw gcErr||new Error('Could not create category');
-    const questions=cat.clues.map((q,sort_order)=>({...q,sort_order})).filter(q=>q.prompt.trim()&&q.answer.trim()).map(q=>({game_id:game.id,game_category_id:gameCat.id,prompt:q.prompt.trim(),answer:q.answer.trim(),value:q.value,sort_order:q.sort_order}));
-    if(questions.length){const {error:qErr}=await supabase.from('game_questions').insert(questions);if(qErr)throw qErr;}
+    const authored=cat.clues.map((q,sort_order)=>({...q,sort_order})).filter(q=>q.prompt.trim()&&q.answer.trim());
+    if(authored.length){
+      const rows=authored.map(q=>({game_id:game.id,game_category_id:gameCat.id,prompt:q.prompt.trim(),value:q.value,sort_order:q.sort_order}));
+      const {data:created,error:qErr}=await supabase.from('game_questions').insert(rows).select('id,sort_order');
+      if(qErr||!created) throw qErr||new Error('Could not create clues');
+      const answers=created.map(q=>({question_id:q.id,game_id:game.id,answer:authored.find(a=>a.sort_order===q.sort_order)!.answer.trim()}));
+      const {error:aErr}=await supabase.from('game_question_answers').insert(answers);
+      if(aErr) throw aErr;
+    }
    }
    router.push(`/host/${code}`);
   }catch(e:any){setError(e?.message||'Could not create game.');setSaving(false);}
