@@ -25,7 +25,6 @@ export interface GameQuestion {
   game_id: string;
   game_category_id: string;
   prompt: string;
-  answer: string;
   value: number;
   sort_order: number;
   state: QuestionState;
