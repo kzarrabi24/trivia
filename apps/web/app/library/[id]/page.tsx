@@ -15,12 +15,16 @@ export default function QuestionSetDetail(){
   const [user,setUser]=useState<any>(null);
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
+  const [metrics,setMetrics]=useState({save_count:0,game_use_count:0});
 
   useEffect(()=>{void load()},[params.id]);
   async function load(){
     const {data:{user}}=await supabase.auth.getUser();setUser(user||null);
     const {data:s,error:sErr}=await supabase.from('question_sets').select('*').eq('id',params.id).single();
     if(sErr){setError(sErr.message);return;} setSet(s as SetRow);
+    const metricId=(s as SetRow).source_set_id||s.id;
+    const {data:m}=await supabase.from('question_set_metrics').select('save_count,game_use_count').eq('set_id',metricId).maybeSingle();
+    if(m) setMetrics({save_count:m.save_count||0,game_use_count:m.game_use_count||0});
     const {data:q,error:qErr}=await supabase.from('question_set_questions').select('*').eq('set_id',params.id).order('category_order').order('question_order');
     if(qErr){setError(qErr.message);return;} setQuestions((q||[]) as Question[]);
   }
@@ -34,7 +38,7 @@ export default function QuestionSetDetail(){
   if(error&&!set) return <main className="shell narrow"><div className="errorBox">{error}</div><Link className="btn secondary" href="/library">Back to library</Link></main>;
   if(!set) return <main className="shell"><div className="panel">Loading set…</div></main>;
   return <main className="shell">
-    <div className="pageTitle"><div><div className="eyebrow">{set.is_published?'Published question set':'Private question set'}</div><h1>{set.title}</h1><p className="muted">{set.description||'No description.'}</p></div><div className="statChip">{questions.length} questions</div></div>
+    <div className="pageTitle"><div><div className="eyebrow">{set.is_published?'Published question set':'Private question set'}</div><h1>{set.title}</h1><p className="muted">{set.description||'No description.'}</p></div><div className="metricPills"><div className="statChip">{questions.length} questions</div><div className="statChip">♡ {metrics.save_count} saves</div><div className="statChip">▶ {metrics.game_use_count} games</div></div></div>
     <div className="actions">
       <Link className="btn" href={`/host?set=${set.id}`}>Use this set in a game</Link>
       {set.is_published&&user?.id!==set.owner_id&&<button className="btn secondary" onClick={saveCopy}>Save a private copy</button>}
