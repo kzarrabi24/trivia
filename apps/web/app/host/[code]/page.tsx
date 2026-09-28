@@ -12,16 +12,19 @@ export default function HostRoom(){
  const {code}=useParams<{code:string}>();
  const [game,setGame]=useState<Game|null>(null);const [cats,setCats]=useState<GameCategory[]>([]);const [questions,setQuestions]=useState<GameQuestion[]>([]);
  const [answers,setAnswers]=useState<Record<string,string>>({});const [players,setPlayers]=useState<GamePlayer[]>([]);const [winner,setWinner]=useState<BuzzWinner|null>(null);
- const [responses,setResponses]=useState<ResponseRow[]>([]);const [error,setError]=useState('');
+ const [responses,setResponses]=useState<ResponseRow[]>([]);const [attemptedIds,setAttemptedIds]=useState<string[]>([]);const [now,setNow]=useState(Date.now());const [error,setError]=useState('');
  const active=questions.find(q=>q.id===game?.active_question_id)||null;const winnerPlayer=players.find(p=>p.id===winner?.player_id)||null;
  const sortedPlayers=[...players].sort((a,b)=>b.score-a.score);const available=useMemo(()=>questions.filter(q=>q.state==='available').length,[questions]);
+ const voicePlayer=players.find(p=>p.id===game?.voice_answer_player_id)||null;
+ const secondsLeft=game?.voice_answer_deadline?Math.max(0,(new Date(game.voice_answer_deadline).getTime()-now)/1000):0;
+ useEffect(()=>{if(!game?.voice_answer_deadline)return;const id=setInterval(()=>setNow(Date.now()),100);return()=>clearInterval(id)},[game?.voice_answer_deadline]);
 
  useEffect(()=>{let mounted=true;let channel:any;void(async()=>{try{
   const user=await ensureUser();const {data:g,error}=await supabase.from('games').select('*').eq('code',String(code).toUpperCase()).single();if(error||!g)throw error||new Error('Room not found');if(g.host_id!==user.id)throw new Error('This room belongs to a different host session.');
   if(!mounted)return;setGame(g as Game);await refresh(g.id);
   channel=supabase.channel('host:'+g.id)
    .on('postgres_changes',{event:'*',schema:'public',table:'game_players',filter:'game_id=eq.'+g.id},()=>refreshPlayers(g.id))
-   .on('postgres_changes',{event:'*',schema:'public',table:'games',filter:'id=eq.'+g.id},async payload=>{const ng=payload.new as Game;setGame(ng);if(ng.active_question_id)await refreshResponses(g.id,ng.active_question_id);else setResponses([])})
+   .on('postgres_changes',{event:'*',schema:'public',table:'games',filter:'id=eq.'+g.id},async payload=>{const ng=payload.new as Game;setGame(ng);if(ng.active_question_id){await Promise.all([refreshResponses(g.id,ng.active_question_id),refreshAttempts(g.id,ng.active_question_id)])}else{setResponses([]);setAttemptedIds([])}})
    .on('postgres_changes',{event:'*',schema:'public',table:'game_questions',filter:'game_id=eq.'+g.id},()=>refreshQuestions(g.id))
    .on('postgres_changes',{event:'INSERT',schema:'public',table:'buzz_winners',filter:'game_id=eq.'+g.id},payload=>setWinner(payload.new as BuzzWinner))
    .on('postgres_changes',{event:'INSERT',schema:'public',table:'question_responses',filter:'game_id=eq.'+g.id},payload=>refreshResponses(g.id,(payload.new as any).question_id))
@@ -34,10 +37,12 @@ export default function HostRoom(){
  async function refreshCats(gameId:string){const {data}=await supabase.from('game_categories').select('*').eq('game_id',gameId).order('sort_order');setCats((data||[]) as GameCategory[])}
  async function refreshAnswers(gameId:string){const {data}=await supabase.from('game_question_answers').select('question_id,answer').eq('game_id',gameId);setAnswers(Object.fromEntries((data||[]).map((x:any)=>[x.question_id,x.answer])))}
  async function refreshResponses(gameId:string,questionId:string){const {data}=await supabase.from('question_responses').select('*').eq('game_id',gameId).eq('question_id',questionId).order('submitted_at');setResponses((data||[]) as ResponseRow[])}
+ async function refreshAttempts(gameId:string,questionId:string){const {data}=await supabase.from('answer_attempts').select('player_id').eq('game_id',gameId).eq('question_id',questionId);setAttemptedIds((data||[]).map((x:any)=>x.player_id))}
  async function call(fn:string,args:any){setError('');const {error}=await supabase.rpc(fn,args);if(error){setError(error.message);return false}return true}
  async function activate(id:string){setWinner(null);setResponses([]);await call('activate_question',{p_game_id:game!.id,p_question_id:id})}
  async function setOpen(open:boolean){if(open)setWinner(null);await call('set_buzzer_open',{p_game_id:game!.id,p_open:open})}
  async function judge(correct:boolean){if(!active||!winnerPlayer)return;await call('judge_answer',{p_game_id:game!.id,p_question_id:active.id,p_player_id:winnerPlayer.id,p_correct:correct});setWinner(null);await refreshPlayers(game!.id);await refreshQuestions(game!.id)}
+ async function callOnWinner(){if(!active||!winnerPlayer||!game)return;await call('start_voice_answer',{p_game_id:game.id,p_question_id:active.id,p_player_id:winnerPlayer.id})}
  async function reopen(){setWinner(null);await call('reopen_buzzer',{p_game_id:game!.id})}
  async function resolve(){if(!active||!game)return;const ok=await call('resolve_response_question',{p_game_id:game.id,p_question_id:active.id});if(ok){setResponses([]);await refreshPlayers(game.id);await refreshQuestions(game.id)}}
 
@@ -47,7 +52,7 @@ export default function HostRoom(){
 
  return <main className="shell wideShell"><div className="roomTop"><div><div className="eyebrow">Host control room · {typeLabel}</div><h1>{game.name}</h1><div className="roomCode">Room code <strong>{game.code}</strong></div></div><div className="roomStats"><span>{players.length} players</span><span>{available} questions left</span>{game.game_type==='jeopardy'&&<span className={game.buzzer_open?'livePill':'idlePill'}>{game.buzzer_open?'BUZZER OPEN':'BUZZER CLOSED'}</span>}</div></div>
  {error&&<div className="errorBox">{error}</div>}
- <div className="hostLayout"><section><div className="board" style={{gridTemplateColumns:'repeat('+Math.max(cats.length,1)+',minmax(150px,1fr))'}}>{cats.map(c=><div className="boardColumn" key={c.id}><div className="categoryTile">{c.name}</div>{questions.filter(q=>q.game_category_id===c.id).sort((a,b)=>a.value-b.value).map(q=><button disabled={q.state!=='available'||!!game.active_question_id} onClick={()=>activate(q.id)} className={'tile '+q.state} key={q.id}>{q.state==='used'?'✓':q.value}</button>)}</div>)}</div></section>
+ <div className="hostLayout"><section>{game.game_type==='jeopardy'&&winnerPlayer&&<div className="fastestBuzzBanner"><div><span>FASTEST BUZZ</span><strong>{winnerPlayer.display_name}</strong>{voicePlayer&&<small>Answering now · {secondsLeft.toFixed(1)}s</small>}</div>{!voicePlayer&&!attemptedIds.includes(winnerPlayer.id)&&<button className="btn" disabled={!winnerPlayer.voice_ready} onClick={callOnWinner}>{winnerPlayer.voice_ready?'Call on '+winnerPlayer.display_name:'Waiting for microphone'}</button>}{attemptedIds.includes(winnerPlayer.id)&&<button className="btn secondary" onClick={reopen}>Reopen buzzer</button>}</div>}<div className="board" style={{gridTemplateColumns:'repeat('+Math.max(cats.length,1)+',minmax(150px,1fr))'}}>{cats.map(c=><div className="boardColumn" key={c.id}><div className="categoryTile">{c.name}</div>{questions.filter(q=>q.game_category_id===c.id).sort((a,b)=>a.value-b.value).map(q=><button disabled={q.state!=='available'||!!game.active_question_id} onClick={()=>activate(q.id)} className={'tile '+q.state} key={q.id}>{q.state==='used'?'✓':q.value}</button>)}</div>)}</div></section>
  <aside className="hostSide"><section className="panel"><div className="sectionTitle"><h3>Live question</h3><span className="muted">{typeLabel}</span></div>
   {active?<>
    {active.media_url&&<div className="questionMedia hostMedia">{active.media_type==='image'?<img src={active.media_url} alt="Question visual"/>:<audio controls src={active.media_url}/>}</div>}
@@ -57,7 +62,7 @@ export default function HostRoom(){
    {game.game_type==='jeopardy'?<div className="actions stackActions">
     {!game.buzzer_open&&!winner&&<button className="btn green" onClick={()=>setOpen(true)}>Open buzzer</button>}
     {game.buzzer_open&&!winner&&<button className="btn secondary" onClick={()=>setOpen(false)}>Close buzzer</button>}
-    {winnerPlayer&&<div className="winnerBox"><div className="eyebrow">First buzz</div><strong>{winnerPlayer.display_name}</strong><div className="judgeRow"><button className="btn green" onClick={()=>judge(true)}>✓ Correct</button><button className="btn dangerBtn" onClick={()=>judge(false)}>✕ Incorrect</button></div></div>}
+    {winnerPlayer&&<div className="winnerBox"><div className="eyebrow">Fastest buzzer</div><strong>{winnerPlayer.display_name}</strong>{voicePlayer?.id===winnerPlayer.id?<div className="voiceHostCountdown">Listening · {secondsLeft.toFixed(1)}s</div>:attemptedIds.includes(winnerPlayer.id)?<div className="muted">Voice answer was judged incorrect. Reopen the buzzer for the remaining players.</div>:<><div className="muted">{winnerPlayer.voice_ready?'Microphone ready':'Player must enable microphone first.'}</div><button className="btn green wide" disabled={!winnerPlayer.voice_ready} onClick={callOnWinner}>{winnerPlayer.voice_ready?'Call on '+winnerPlayer.display_name+' · 5 sec':'Waiting for microphone'}</button><details><summary>Manual fallback</summary><div className="judgeRow"><button className="btn green" onClick={()=>judge(true)}>✓ Correct</button><button className="btn dangerBtn" onClick={()=>judge(false)}>✕ Incorrect</button></div></details></>}</div>}
     {!game.buzzer_open&&!winner&&active&&<button className="btn secondary" onClick={reopen}>Reopen for remaining players</button>}
    </div>:<div className="responseHost">
     <div className="sectionTitle"><h3>Responses</h3><span className="statChip">{responses.length}/{players.length}</span></div>
