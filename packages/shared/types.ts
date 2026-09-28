@@ -14,6 +14,9 @@ export interface Game {
   buzz_round: number;
   game_type: GameType;
   source_question_set_id?: string | null;
+  voice_answer_player_id?: string | null;
+  voice_answer_started_at?: string | null;
+  voice_answer_deadline?: string | null;
 }
 
 export interface GameCategory {
@@ -43,6 +46,7 @@ export interface GamePlayer {
   user_id: string;
   display_name: string;
   score: number;
+  voice_ready?: boolean;
 }
 
 export interface CategoryStat {
