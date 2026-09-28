@@ -1,0 +1,7 @@
+{
+  "name":"buzzboard",
+  "version":"0.2.0",
+  "private":true,
+  "workspaces":["apps/*","packages/*"],
+  "scripts":{"web":"npm --workspace buzzboard-web run dev","mobile":"npm --workspace buzzboard-mobile run start","build:web":"npm --workspace buzzboard-web run build","typecheck":"npm --workspace buzzboard-web run typecheck && npm --workspace buzzboard-mobile run typecheck"}
+}
