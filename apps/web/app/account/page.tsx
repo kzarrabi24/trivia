@@ -106,7 +106,7 @@ export default function AccountPage() {
       <p className="muted">Your account can publish community question sets, save copies of other creators&apos; sets, and keep a reusable personal library.</p>
       <div className="actions">
         <Link className="btn" href="/library">Browse question sets</Link>
-        <Link className="btn secondary" href="/library/new">Create a question set</Link>
+        <Link className="btn secondary" href="/library/new">Create a question set</Link><Link className="btn secondary" href="/creator">Creator analytics</Link>
         <button className="btn secondary" onClick={signOut}>Sign out</button>
       </div>
     </section> : <>
