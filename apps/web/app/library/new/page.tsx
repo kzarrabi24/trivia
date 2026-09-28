@@ -26,9 +26,12 @@ export default function NewQuestionSet(){
   useEffect(()=>{(async()=>{const {data:{user}}=await supabase.auth.getUser();setUser(user||null);setReady(true)})()},[]);
   const updateCat=(i:number,patch:Partial<Cat>)=>setCats(cats.map((c,x)=>x===i?{...c,...patch}:c));
   const updateClue=(ci:number,qi:number,key:'prompt'|'answer',value:string)=>setCats(cats.map((c,x)=>x!==ci?c:{...c,clues:c.clues.map((q,y)=>y===qi?{...q,[key]:value}:q)}));
+  const addQuestion=(ci:number)=>{if(clueCount>=200)return;setCats(cats.map((c,x)=>x!==ci?c:{...c,clues:[...c.clues,{prompt:'',answer:'',value:values[c.clues.length%5]}]}))};
+  const removeQuestion=(ci:number,qi:number)=>setCats(cats.map((c,x)=>x!==ci?c:{...c,clues:c.clues.filter((_,y)=>y!==qi)}));
 
   async function save(){
     if(!user || user.is_anonymous){setError('A permanent account is required to publish or save question sets.');return;}
+    if(clueCount>200){setError('Question sets may contain at most 200 questions.');return;}
     setSaving(true);setError('');
     try{
       const {data:set,error:setErr}=await supabase.from('question_sets').insert({
@@ -52,7 +55,7 @@ export default function NewQuestionSet(){
   if(!user || user.is_anonymous) return <main className="shell narrow"><div className="eyebrow">Creator access</div><h1>Create question sets</h1><div className="panel"><p className="muted">Publishing and personal question libraries require a permanent BuzzBoard account.</p><Link className="btn" href="/account">Create or sign into an account</Link></div></main>;
 
   return <main className="shell">
-    <div className="pageTitle"><div><div className="eyebrow">Question set creator</div><h1>Build a reusable set.</h1><p className="muted">Create a Lakers pack, movie night board, office trivia collection, or anything else you want to reuse.</p></div><div className="statChip">{clueCount} questions</div></div>
+    <div className="pageTitle"><div><div className="eyebrow">Question set creator</div><h1>Build a reusable set.</h1><p className="muted">Create up to 200 questions across as many categories as you want. Large categories become question pools and BuzzBoard randomly selects up to 5 when a game is created.</p></div><div className="metricPills"><div className="statChip">{clueCount}/200 questions</div><Link className="btn secondary" href="/library/import">Import CSV</Link></div></div>
     <section className="panel formStack">
       <div><label className="label">Set title</label><input className="input" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Los Angeles Lakers" /></div>
       <div><label className="label">Description</label><textarea className="input textarea" value={description} onChange={e=>setDescription(e.target.value)} placeholder="Questions covering Lakers history, stars, championships and memorable moments." /></div>
@@ -60,9 +63,9 @@ export default function NewQuestionSet(){
     </section>
     <div className="builderGrid">{cats.map((cat,ci)=><section className="categoryEditor" key={ci}>
       <div className="categoryEditorHead"><input className="categoryName" value={cat.name} onChange={e=>updateCat(ci,{name:e.target.value})}/><button className="iconBtn danger" onClick={()=>setCats(cats.filter((_,x)=>x!==ci))} title="Remove category">×</button></div>
-      {cat.clues.map((q,qi)=><div className="clueEditor" key={q.value}><div className="valueBadge">{q.value}</div><input placeholder="Clue / question" value={q.prompt} onChange={e=>updateClue(ci,qi,'prompt',e.target.value)}/><input placeholder="Correct answer" value={q.answer} onChange={e=>updateClue(ci,qi,'answer',e.target.value)}/></div>)}
+      {cat.clues.map((q,qi)=><div className="clueEditor" key={qi}><div className="valueBadge">{q.value}</div><input placeholder="Clue / question" value={q.prompt} onChange={e=>updateClue(ci,qi,'prompt',e.target.value)}/><div className="clueAnswerRow"><input placeholder="Correct answer" value={q.answer} onChange={e=>updateClue(ci,qi,'answer',e.target.value)}/><button className="miniDelete" type="button" onClick={()=>removeQuestion(ci,qi)}>×</button></div></div>)}<button className="addQuestionBtn" type="button" disabled={clueCount>=200} onClick={()=>addQuestion(ci)}>+ Add question to this category</button>
     </section>)}</div>
-    <div className="actions"><button className="btn secondary" onClick={()=>setCats([...cats,{name:`Category ${cats.length+1}`,clues:blankClues()}])}>+ Add category</button><button className="btn" disabled={saving||!title.trim()||clueCount===0} onClick={save}>{saving?'Saving…':published?'Publish question set':'Save private set'}</button></div>
+    <div className="actions"><button className="btn secondary" onClick={()=>setCats([...cats,{name:`Category ${cats.length+1}`,clues:blankClues()}])}>+ Add category</button><button className="btn" disabled={saving||!title.trim()||clueCount===0||clueCount>200} onClick={save}>{saving?'Saving…':published?'Publish question set':'Save private set'}</button></div>
     {error&&<div className="errorBox">{error}</div>}
   </main>
 }
