@@ -38,7 +38,15 @@ export default function Host(){
     if(!grouped.has(row.category_order)) grouped.set(row.category_order,{name:row.category_name,clues:[]});
     grouped.get(row.category_order)!.clues.push({prompt:row.prompt,answer:row.answer,value:row.value});
   });
-  const loaded=Array.from(grouped.entries()).sort((a,b)=>a[0]-b[0]).map(([,cat])=>cat);
+  const shuffle=<T,>(items:T[])=>{
+    const copy=[...items];
+    for(let i=copy.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]}
+    return copy;
+  };
+  const loaded=Array.from(grouped.entries()).sort((a,b)=>a[0]-b[0]).map(([,cat])=>({
+    ...cat,
+    clues:shuffle(cat.clues).slice(0,5).map((q,i)=>({...q,value:values[i]}))
+  }));
   if(loaded.length){setCats(loaded);setName(set.title);setSourceSetId(set.source_set_id||set.id);}
  }
  const updateCat=(i:number,patch:Partial<Cat>)=>setCats(cats.map((c,x)=>x===i?{...c,...patch}:c));
@@ -68,7 +76,7 @@ export default function Host(){
    router.push(`/host/${code}`);
   }catch(e:any){setError(e?.message||'Could not create game.');setSaving(false);}
  }
- return <main className="shell"><div className="eyebrow">Host studio</div><div className="pageTitle"><div><h1>Build your board.</h1><p className="muted">Categories are flexible. Fill only the clues you want to use.</p></div><div className="statChip">{clueCount} ready clues</div></div>
+ return <main className="shell"><div className="eyebrow">Host studio</div><div className="pageTitle"><div><h1>Build your board.</h1><p className="muted">Categories are flexible. When you load a large question set, BuzzBoard randomly selects up to 5 questions per category for this game.</p></div><div className="statChip">{clueCount} ready clues</div></div>
   <section className="panel"><label className="label">Game name</label><input className="input" value={name} onChange={e=>setName(e.target.value)}/></section>
   <div className="builderGrid">{cats.map((cat,ci)=><section className="categoryEditor" key={ci}><div className="categoryEditorHead"><input className="categoryName" value={cat.name} onChange={e=>updateCat(ci,{name:e.target.value})}/><button className="iconBtn danger" onClick={()=>setCats(cats.filter((_,x)=>x!==ci))} title="Remove category">×</button></div>{cat.clues.map((q,qi)=><div className="clueEditor" key={q.value}><div className="valueBadge">{q.value}</div><input placeholder="Clue / question" value={q.prompt} onChange={e=>updateClue(ci,qi,'prompt',e.target.value)}/><input placeholder="Correct answer" value={q.answer} onChange={e=>updateClue(ci,qi,'answer',e.target.value)}/></div>)}</section>)}</div>
   <div className="actions"><button className="btn secondary" onClick={()=>setCats([...cats,{name:`Category ${cats.length+1}`,clues:blankClues()}])}>+ Add category</button><button className="btn" disabled={saving||cats.length===0||clueCount===0} onClick={createGame}>{saving?'Creating room…':'Create live room'}</button></div>{error&&<div className="errorBox">{error}</div>}
