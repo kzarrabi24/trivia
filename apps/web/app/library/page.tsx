@@ -67,7 +67,7 @@ export default function LibraryPage() {
 
   return <main className="shell">
     <div className="pageTitle"><div><div className="eyebrow">Community library</div><h1>Question sets</h1><p className="muted">Browse published trivia packs, save a private copy to your account, or launch one directly into the host builder.</p></div>
-      <Link className="btn" href="/library/new">Create a set</Link></div>
+      <div className="actions"><Link className="btn secondary" href="/library/import">Import CSV</Link><Link className="btn" href="/library/new">Create a set</Link></div></div>
     {message&&<div className="successBox">{message}</div>}{error&&<div className="errorBox">{error}</div>}
 
     {user && !user.is_anonymous && <section id="my-library" className="librarySection">
