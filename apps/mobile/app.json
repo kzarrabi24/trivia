@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "BuzzBoard",
+    "slug": "buzzboard",
+    "scheme": "buzzboard",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": ["expo-router", "expo-secure-store"],
+    "ios": {"supportsTablet": true, "bundleIdentifier": "com.buzzboard.trivia"},
+    "android": {"package": "com.buzzboard.trivia"},
+    "experiments": {"typedRoutes": true}
+  }
+}

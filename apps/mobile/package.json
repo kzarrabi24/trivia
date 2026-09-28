@@ -1,0 +1,9 @@
+{
+  "name":"buzzboard-mobile",
+  "version":"0.2.0",
+  "private":true,
+  "main":"expo-router/entry",
+  "scripts":{"start":"expo start","ios":"expo start --ios","android":"expo start --android","typecheck":"tsc --noEmit"},
+  "dependencies":{"@buzzboard/shared":"*","@supabase/supabase-js":"^2.49.4","expo":"^54.0.0","expo-router":"^6.0.0","expo-secure-store":"^15.0.0","react":"^19.1.0","react-native":"^0.81.0","react-native-url-polyfill":"^2.0.0"},
+  "devDependencies":{"typescript":"^5.7.0","@types/react":"^19.0.0"}
+}
