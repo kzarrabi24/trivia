@@ -13,6 +13,7 @@ export default function LibraryPage() {
   const [publicSets,setPublicSets]=useState<SetRow[]>([]);
   const [mySets,setMySets]=useState<SetRow[]>([]);
   const [counts,setCounts]=useState<Record<string,number>>({});
+  const [metrics,setMetrics]=useState<Record<string,{save_count:number;game_use_count:number}>>({});
   const [user,setUser]=useState<any>(null);
   const [loading,setLoading]=useState(true);
   const [message,setMessage]=useState('');
@@ -46,6 +47,10 @@ export default function LibraryPage() {
       const c:Record<string,number>={};
       (q||[]).forEach((row:any)=>c[row.set_id]=(c[row.set_id]||0)+1);
       setCounts(c);
+      const {data:m}=await supabase.from('question_set_metrics').select('set_id,save_count,game_use_count').in('set_id',ids);
+      const mm:Record<string,{save_count:number;game_use_count:number}>={};
+      (m||[]).forEach((row:any)=>mm[row.set_id]={save_count:row.save_count||0,game_use_count:row.game_use_count||0});
+      setMetrics(mm);
     }
     setLoading(false);
   }
@@ -68,7 +73,7 @@ export default function LibraryPage() {
     {user && !user.is_anonymous && <section id="my-library" className="librarySection">
       <div className="sectionTitle"><h2>My library</h2><span className="muted">{mySets.length} sets</span></div>
       {mySets.length?<div className="setGrid">{mySets.map(s=><article className="setCard" key={s.id}>
-        <div className="setMeta"><span>{s.is_published?'Published':'Private'}</span><span>{counts[s.id]||0} questions</span></div>
+        <div className="setMeta"><span>{s.is_published?'Published':'Private'}</span><span>{counts[s.id]||0} questions</span></div><div className="setMetrics"><span>♡ {metrics[s.source_set_id||s.id]?.save_count||0} saves</span><span>▶ {metrics[s.source_set_id||s.id]?.game_use_count||0} games</span></div>
         <h3>{s.title}</h3><p>{s.description||'No description yet.'}</p>
         <div className="actions"><Link className="btn" href={`/host?set=${s.id}`}>Use in game</Link><Link className="btn secondary" href={`/library/${s.id}`}>View</Link></div>
       </article>)}</div>:<div className="emptyState panel">You have not saved or created any question sets yet.</div>}
@@ -77,7 +82,7 @@ export default function LibraryPage() {
     <section className="librarySection">
       <div className="sectionTitle"><h2>Published by the community</h2><span className="muted">{publicSets.length} sets</span></div>
       {loading?<div className="panel">Loading question sets…</div>:publicSets.length?<div className="setGrid">{publicSets.map(s=><article className="setCard" key={s.id}>
-        <div className="setMeta"><span>Community</span><span>{counts[s.id]||0} questions</span></div>
+        <div className="setMeta"><span>Community</span><span>{counts[s.id]||0} questions</span></div><div className="setMetrics"><span>♡ {metrics[s.id]?.save_count||0} saves</span><span>▶ {metrics[s.id]?.game_use_count||0} games</span></div>
         <h3>{s.title}</h3><p>{s.description||'No description yet.'}</p>
         <div className="actions">
           <Link className="btn" href={`/host?set=${s.id}`}>Use now</Link>
