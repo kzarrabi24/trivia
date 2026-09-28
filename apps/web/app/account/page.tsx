@@ -77,7 +77,7 @@ export default function AccountPage() {
       await clearAnonymousSession();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/account` }
+        options: { redirectTo: `${window.location.hostname === 'localhost' ? 'https://trivia-ten-sepia.vercel.app' : window.location.origin}/account` }
       });
       if (error) throw error;
     } catch (e:any) {
